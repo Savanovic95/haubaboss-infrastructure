@@ -1,0 +1,143 @@
+name: Deploy Full Stack
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_frontend:
+        description: 'Deploy frontend'
+        required: true
+        default: true
+        type: boolean
+      deploy_backend:
+        description: 'Deploy backend'
+        required: true
+        default: true
+        type: boolean
+      run_migrations:
+        description: 'Run database migrations'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  deploy:
+    name: Deploy Infrastructure & Apps
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout infrastructure
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+
+      - name: Sync infrastructure files
+        run: |
+          rsync -avz --progress \
+            -e "ssh -i ~/.ssh/id_ed25519" \
+            --exclude '.git' \
+            --exclude '.env' \
+            --exclude 'db-backups/*.sql' \
+            --exclude '.DS_Store' \
+            ./ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/var/www/haubaboss/
+
+      - name: Deploy full stack
+        run: |
+          ssh -i ~/.ssh/id_ed25519 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'ENDSSH'
+          set -e
+          cd /var/www/haubaboss
+          
+          # Make scripts executable
+          chmod +x scripts/*.sh
+          
+          echo "=========================================="
+          echo "  Pulling Frontend Repository"
+          echo "=========================================="
+          if [ -d "haubaboss-frontend/.git" ]; then
+              cd haubaboss-frontend
+              git fetch origin
+              git reset --hard origin/main
+              cd ..
+          else
+              echo "Cloning frontend repository..."
+              rm -rf haubaboss-frontend
+              git clone git@github.com:Savanovic95/haubaboss-frontend.git haubaboss-frontend
+          fi
+          
+          echo "=========================================="
+          echo "  Pulling Backend Repository"
+          echo "=========================================="
+          if [ -d "haubaboss-backend/.git" ]; then
+              cd haubaboss-backend
+              git fetch origin
+              git reset --hard origin/main
+              cd ..
+          else
+              echo "Cloning backend repository..."
+              rm -rf haubaboss-backend
+              git clone git@github.com:Savanovic95/haubaboss-backend.git haubaboss-backend
+          fi
+          
+          echo "=========================================="
+          echo "  Building and Starting Containers"
+          echo "=========================================="
+          
+          # Load environment variables
+          source .env
+          
+          # Build all containers
+          docker compose build \
+            --build-arg NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://89.167.24.255} \
+            --build-arg API_URL=http://nginx
+          
+          # Start all containers
+          docker compose up -d
+          
+          # Wait for DB to be healthy
+          echo "Waiting for database..."
+          sleep 10
+          
+          echo "=========================================="
+          echo "  Running Migrations"
+          echo "=========================================="
+          docker compose exec -T backend php artisan migrate --force || true
+          
+          echo "=========================================="
+          echo "  Caching Laravel Config"
+          echo "=========================================="
+          docker compose exec -T backend php artisan config:cache || true
+          docker compose exec -T backend php artisan route:cache || true
+          docker compose exec -T backend php artisan view:cache || true
+          docker compose exec -T backend php artisan storage:link 2>/dev/null || true
+          
+          echo "=========================================="
+          echo "  Validating Database"
+          echo "=========================================="
+          docker compose exec -T backend php artisan db:validate || true
+          
+          echo "=========================================="
+          echo "  Full Stack Deployment Complete!"
+          echo "=========================================="
+          ENDSSH
+
+      - name: Health check
+        run: |
+          sleep 10
+          echo "Checking frontend..."
+          curl -f http://${{ secrets.SERVER_IP }}/ || echo "Frontend check failed"
+          echo "Checking API..."
+          curl -f http://${{ secrets.SERVER_IP }}/api/health || echo "API health check failed"
+
+      - name: Notify success
+        if: success()
+        run: echo "✅ Full stack deployed successfully to production"
+
+      - name: Notify failure
+        if: failure()
+        run: echo "❌ Deployment failed - check logs above"
