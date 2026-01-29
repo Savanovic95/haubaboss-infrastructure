@@ -207,3 +207,4 @@ docker compose restart backend
 # After adding to package.json - requires rebuild
 docker compose up -d --build frontend# Test 1769712335
 # Deploy test 1769712514
+# Test 1769713481
