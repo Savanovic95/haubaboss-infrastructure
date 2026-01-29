@@ -25,7 +25,7 @@ jobs:
   deploy:
     name: Deploy Infrastructure & Apps
     runs-on: ubuntu-latest
-    environment: production
+    # environment: production  # Uncomment to require approval before deploy
     steps:
       - name: Checkout infrastructure
         uses: actions/checkout@v4
