@@ -1,0 +1,16 @@
+# Ignore subproject directories (they have their own git repos)
+haubaboss-backend/
+haubaboss-frontend/
+
+# Environment files
+.env
+.env.local
+
+# OS files
+.DS_Store
+
+# Backups (keep .gitkeep)
+db-backups/*.sql
+
+# Logs
+nginx/logs/*.log

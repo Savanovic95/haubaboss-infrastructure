@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: haubaboss-db
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-secretroot}
+      MYSQL_DATABASE: ${DB_DATABASE:-haubaboss_app}
+      MYSQL_USER: ${DB_USERNAME:-haubaboss}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secretpassword}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db-init:/docker-entrypoint-initdb.d
+      - ./db-backups:/backups
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    networks:
+      - haubaboss-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-secretroot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Laravel Backend (PHP-FPM)
+  backend:
+    build:
+      context: ./haubaboss-backend
+      dockerfile: Dockerfile
+    container_name: haubaboss-backend
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./haubaboss-backend:/var/www/html
+      - ./haubaboss-backend/storage:/var/www/html/storage
+      - ./haubaboss-backend/bootstrap/cache:/var/www/html/bootstrap/cache
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_KEY: ${APP_KEY}
+      APP_URL: ${APP_URL:-http://localhost}
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-haubaboss_app}
+      DB_USERNAME: ${DB_USERNAME:-haubaboss}
+      DB_PASSWORD: ${DB_PASSWORD:-secretpassword}
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+      QUEUE_CONNECTION: database
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - haubaboss-network
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: ./haubaboss-frontend
+      dockerfile: Dockerfile
+    container_name: haubaboss-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost}
+      API_URL: http://nginx
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - haubaboss-network
+
+  # Nginx Reverse Proxy (handles subdomains for multi-tenancy)
+  nginx:
+    image: nginx:alpine
+    container_name: haubaboss-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./haubaboss-backend/public:/var/www/html/public:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - haubaboss-network
+
+networks:
+  haubaboss-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local

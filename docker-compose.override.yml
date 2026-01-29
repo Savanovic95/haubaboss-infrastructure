@@ -1,0 +1,26 @@
+# Development overrides - automatically loaded with docker-compose.yml
+# This file is for LOCAL DEVELOPMENT only
+
+version: '3.8'
+
+services:
+  backend:
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+    # Mount source code for hot-reload during development
+    volumes:
+      - ./haubaboss-backend:/var/www/html
+      - /var/www/html/vendor  # Exclude vendor from mount
+
+  frontend:
+    # For development, you might want to run Next.js in dev mode instead
+    # Uncomment below to use dev server with hot reload
+    # command: npm run dev
+    environment:
+      NODE_ENV: development
+
+  # Expose MySQL port for local DB tools (TablePlus, DBeaver, etc.)
+  db:
+    ports:
+      - "3306:3306"

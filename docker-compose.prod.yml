@@ -1,0 +1,49 @@
+# Production overrides for docker-compose.yml
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# This configuration enables:
+# - Optimized production builds
+# - No volume mounts (uses built images)
+# - Restart policies
+# - Resource limits
+
+services:
+  db:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  backend:
+    restart: always
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      LOG_LEVEL: error
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  frontend:
+    restart: always
+    build:
+      context: ./haubaboss-frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost}
+        API_URL: http://nginx
+    environment:
+      NODE_ENV: production
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  nginx:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 128M
