@@ -4,6 +4,24 @@ Docker infrastructure, deployment scripts, and documentation for the HaubaBoss a
 
 ## Quick Start Commands
 
+# Local development
+./scripts/dev-start.sh
+ 
+# Production deployment (on server)
+./scripts/prod-deploy.sh
+ 
+# Sync Mac DB → Local Docker
+./scripts/db-sync-from-local.sh local
+ 
+# Sync Mac DB → Production
+./scripts/db-sync-from-local.sh production
+ 
+# Backup production to Mac
+./scripts/db-backup-prod.sh
+ 
+# Stop containers
+docker compose down
+
 ### 1. Local Development (Single Command)
 
 ```bash
@@ -149,3 +167,42 @@ docker compose exec backend sh
 # MySQL CLI
 docker compose exec db mysql -u root -p
 ```
+
+### Backend (Laravel/PHP) - Mostly Automatic
+Most PHP changes are automatically reflected because PHP reloads on each request. No restart needed for:
+
+Controllers
+Models
+Routes
+Views
+Restart needed only for:
+
+Changes to .env file
+Changes to config/*.php files
+Installing new Composer packages
+
+```bash
+# If you need to restart backend
+docker compose restart backend
+ 
+# If you changed config files
+docker compose exec backend php artisan config:clear
+```
+
+### Database Changes (Migrations)
+```bash
+# After adding a new migration
+docker compose exec backend php artisan migrate
+```
+
+### New Composer Packages
+```bash
+# After adding to composer.json
+docker compose exec backend composer install
+docker compose restart backend
+```
+
+### New NPM Packages
+```bash
+# After adding to package.json - requires rebuild
+docker compose up -d --build frontend
