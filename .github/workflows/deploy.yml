@@ -30,110 +30,41 @@ jobs:
       - name: Checkout infrastructure
         uses: actions/checkout@v4
 
-      - name: Setup SSH
-        uses: shimataro/ssh-key-action@v2
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          known_hosts: unnecessary
-          if_key_exists: replace
-      
-      - name: Add known hosts
-        run: ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
-
-      - name: Sync infrastructure files
-        env:
-          SERVER_USER: ${{ secrets.SERVER_USER }}
-          SERVER_IP: ${{ secrets.SERVER_IP }}
-        run: |
-          rsync -avz --progress \
-            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
-            --exclude '.git' \
-            --exclude '.env' \
-            --exclude 'db-backups/*.sql' \
-            --exclude '.DS_Store' \
-            ./ ${SERVER_USER}@${SERVER_IP}:/var/www/haubaboss/
-
-      - name: Deploy full stack
-        env:
-          SERVER_USER: ${{ secrets.SERVER_USER }}
-          SERVER_IP: ${{ secrets.SERVER_IP }}
-        run: |
-          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_IP} << 'ENDSSH'
-          set -e
-          cd /var/www/haubaboss
-          
-          # Make scripts executable
-          chmod +x scripts/*.sh
-          
-          echo "=========================================="
-          echo "  Pulling Frontend Repository"
-          echo "=========================================="
-          if [ -d "haubaboss-frontend/.git" ]; then
-              cd haubaboss-frontend
-              git fetch origin
-              git reset --hard origin/main
-              cd ..
-          else
-              echo "Cloning frontend repository..."
+          script: |
+            set -e
+            cd /var/www/haubaboss
+            chmod +x scripts/*.sh
+            echo "Pulling repositories..."
+            if [ -d "haubaboss-frontend/.git" ]; then
+              cd haubaboss-frontend && git fetch origin && git reset --hard origin/main && cd ..
+            else
               rm -rf haubaboss-frontend
               git clone git@github.com:Savanovic95/haubaboss-frontend.git haubaboss-frontend
-          fi
-          
-          echo "=========================================="
-          echo "  Pulling Backend Repository"
-          echo "=========================================="
-          if [ -d "haubaboss-backend/.git" ]; then
-              cd haubaboss-backend
-              git fetch origin
-              git reset --hard origin/main
-              cd ..
-          else
-              echo "Cloning backend repository..."
+            fi
+            if [ -d "haubaboss-backend/.git" ]; then
+              cd haubaboss-backend && git fetch origin && git reset --hard origin/main && cd ..
+            else
               rm -rf haubaboss-backend
               git clone git@github.com:Savanovic95/haubaboss-backend.git haubaboss-backend
-          fi
-          
-          echo "=========================================="
-          echo "  Building and Starting Containers"
-          echo "=========================================="
-          
-          # Load environment variables
-          source .env
-          
-          # Build all containers
-          docker compose build \
-            --build-arg NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://89.167.24.255} \
-            --build-arg API_URL=http://nginx
-          
-          # Start all containers
-          docker compose up -d
-          
-          # Wait for DB to be healthy
-          echo "Waiting for database..."
-          sleep 10
-          
-          echo "=========================================="
-          echo "  Running Migrations"
-          echo "=========================================="
-          docker compose exec -T backend php artisan migrate --force || true
-          
-          echo "=========================================="
-          echo "  Caching Laravel Config"
-          echo "=========================================="
-          docker compose exec -T backend php artisan config:cache || true
-          docker compose exec -T backend php artisan route:cache || true
-          docker compose exec -T backend php artisan view:cache || true
-          docker compose exec -T backend php artisan storage:link 2>/dev/null || true
-          
-          echo "=========================================="
-          echo "  Validating Database"
-          echo "=========================================="
-          docker compose exec -T backend php artisan db:validate || true
-          
-          echo "=========================================="
-          echo "  Full Stack Deployment Complete!"
-          echo "=========================================="
-          ENDSSH
+            fi
+            echo "Building containers..."
+            source .env
+            docker compose build --build-arg NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://89.167.24.255} --build-arg API_URL=http://nginx
+            docker compose up -d
+            sleep 10
+            echo "Running migrations..."
+            docker compose exec -T backend php artisan migrate --force || true
+            docker compose exec -T backend php artisan config:cache || true
+            docker compose exec -T backend php artisan route:cache || true
+            docker compose exec -T backend php artisan view:cache || true
+            docker compose exec -T backend php artisan storage:link 2>/dev/null || true
+            echo "Deployment complete!"
 
       - name: Health check
         env:
