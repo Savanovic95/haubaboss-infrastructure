@@ -205,4 +205,4 @@ docker compose restart backend
 ### New NPM Packages
 ```bash
 # After adding to package.json - requires rebuild
-docker compose up -d --build frontend
+docker compose up -d --build frontend# Test 1769712335
