@@ -38,6 +38,9 @@ jobs:
           ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
 
       - name: Sync infrastructure files
+        env:
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
           rsync -avz --progress \
             -e "ssh -i ~/.ssh/id_ed25519" \
@@ -45,11 +48,14 @@ jobs:
             --exclude '.env' \
             --exclude 'db-backups/*.sql' \
             --exclude '.DS_Store' \
-            ./ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/var/www/haubaboss/
+            ./ ${SERVER_USER}@${SERVER_IP}:/var/www/haubaboss/
 
       - name: Deploy full stack
+        env:
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
-          ssh -i ~/.ssh/id_ed25519 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'ENDSSH'
+          ssh -i ~/.ssh/id_ed25519 ${SERVER_USER}@${SERVER_IP} << 'ENDSSH'
           set -e
           cd /var/www/haubaboss
           
@@ -127,12 +133,14 @@ jobs:
           ENDSSH
 
       - name: Health check
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
           sleep 10
           echo "Checking frontend..."
-          curl -f http://${{ secrets.SERVER_IP }}/ || echo "Frontend check failed"
+          curl -f http://${SERVER_IP}/ || echo "Frontend check failed"
           echo "Checking API..."
-          curl -f http://${{ secrets.SERVER_IP }}/api/health || echo "API health check failed"
+          curl -f http://${SERVER_IP}/api/v1/health || echo "API health check failed"
 
       - name: Notify success
         if: success()
