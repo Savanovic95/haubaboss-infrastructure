@@ -9,6 +9,7 @@ services:
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-secretroot}
+      MYSQL_ROOT_HOST: '%'
       MYSQL_DATABASE: ${DB_DATABASE:-haubaboss_app}
       MYSQL_USER: ${DB_USERNAME:-haubaboss}
       MYSQL_PASSWORD: ${DB_PASSWORD:-secretpassword}
@@ -16,8 +17,9 @@ services:
       - mysql_data:/var/lib/mysql
       - ./db-init:/docker-entrypoint-initdb.d
       - ./db-backups:/backups
-    ports:
-      - "${DB_PORT:-3306}:3306"
+    # SECURITY: Do NOT expose MySQL port to the internet
+    # The backend connects via internal Docker network (db:3306)
+    # For local development, use docker-compose.local.yml to expose the port
     networks:
       - haubaboss-network
     healthcheck:

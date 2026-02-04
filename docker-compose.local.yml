@@ -1,0 +1,23 @@
+# Local development - only database
+# Usage: docker compose -f docker-compose.local.yml up -d
+services:
+  db:
+    container_name: haubaboss-db-local
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-haubaboss_app}
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data-local:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+
+volumes:
+  mysql-data-local:
