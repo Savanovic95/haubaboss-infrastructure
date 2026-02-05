@@ -19,6 +19,8 @@ services:
     # command: npm run dev
     environment:
       NODE_ENV: development
+      # Use host.docker.internal for server-side requests from Next.js
+      API_URL: http://host.docker.internal
 
   # Expose MySQL port for local DB tools (TablePlus, DBeaver, etc.)
   db:

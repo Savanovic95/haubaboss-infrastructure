@@ -69,11 +69,13 @@ Access at: **http://localhost**
 
 ```bash
 # Start only database in Docker
-./scripts/dev.sh hybrid
+docker compose -f docker-compose.local.yml up -d
 
 # In Terminal 1: Backend
 cd haubaboss-backend
-cp .env.example .env  # First time only
+# First time only: ensure .env has these DB settings:
+# DB_HOST=127.0.0.1, DB_USERNAME=root, DB_PASSWORD= (empty)
+php artisan migrate --seed  # First time only
 php artisan serve --port=8000
 
 # In Terminal 2: Frontend
