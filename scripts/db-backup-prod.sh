@@ -54,7 +54,7 @@ ssh -i $SSH_KEY ${REMOTE_USER}@${REMOTE_HOST} << 'ENDSSH'
 cd /var/www/haubaboss
 source .env
 echo "Database stats:"
-docker compose exec -T db mysql -u root -p${DB_ROOT_PASSWORD} haubaboss_app -e "
+docker compose exec -T db mysql -u ${DB_USERNAME} -p${DB_PASSWORD} haubaboss_app -e "
 SELECT 
     (SELECT COUNT(*) FROM users) as users,
     (SELECT COUNT(*) FROM companies) as companies,
@@ -69,7 +69,7 @@ echo -e "${BLUE}[3/4]${NC} Creating backup on server..."
 ssh -i $SSH_KEY ${REMOTE_USER}@${REMOTE_HOST} << 'ENDSSH'
 cd /var/www/haubaboss
 source .env
-docker compose exec -T db mysqldump -u root -p${DB_ROOT_PASSWORD} haubaboss_app \
+docker compose exec -T db mysqldump -u ${DB_USERNAME} -p${DB_PASSWORD} haubaboss_app \
     --single-transaction \
     --routines \
     --triggers \
